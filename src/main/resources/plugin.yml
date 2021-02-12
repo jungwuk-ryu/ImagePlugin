@@ -1,0 +1,12 @@
+name: ImagePlugin
+main: hancho.plugin.imageplugin.ImagePlugin
+version: 1.0.0
+api: [1.0.0]
+author: Hancho
+
+commands:
+  imageplugin:
+    description: "이미지 설치 및 제거 명령어"
+    permission: "op"
+    aliases:
+      - ip
