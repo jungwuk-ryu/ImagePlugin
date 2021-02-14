@@ -128,7 +128,7 @@ public class ImagePlugin extends PluginBase implements Listener {
     public void onItemFrameDropItem(ItemFrameDropItemEvent ev){
         Item item = ev.getItem();
         CompoundTag tag = item.getNamedTag();
-        if(tag.contains("ip_sx") && ! ev.getPlayer().getName().equals(tag.getString("img_owner"))) ev.setCancelled();
+        if(tag != null && tag.contains("ip_sx") && ! ev.getPlayer().getName().equals(tag.getString("img_owner"))) ev.setCancelled();
     }
 
     @Override
