@@ -7,9 +7,10 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
-import cn.nukkit.event.block.BlockBreakEvent;
+import cn.nukkit.event.block.BlockUpdateEvent;
 import cn.nukkit.event.block.ItemFrameDropItemEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
@@ -17,10 +18,12 @@ import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemItemFrame;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.plugin.PluginBase;
+import cn.nukkit.utils.ChunkException;
 import hancho.plugin.imageplugin.entity.RequestInformation;
 
 import javax.imageio.ImageIO;
@@ -30,6 +33,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class ImagePlugin extends PluginBase implements Listener {
     public static final String PREFIX = "§7§o[ ! ] ";
@@ -158,6 +162,21 @@ public class ImagePlugin extends PluginBase implements Listener {
         return true;
     }
 
+    @EventHandler
+    public void onBlockUpdate(BlockUpdateEvent ev){
+        Block block = ev.getBlock();
+        if(block.getId() == BlockID.ITEM_FRAME_BLOCK){
+            BlockEntityItemFrame blockEntity = (BlockEntityItemFrame) block.getLevel().getBlockEntity(block.getLocation());
+            if(blockEntity != null){
+                Item itemOnFrame = blockEntity.getItem();
+                CompoundTag tag;
+                if(itemOnFrame != null && (tag = itemOnFrame.getNamedTag()) != null && tag.exist("ip_sx")){
+                    ev.setCancelled();
+                }
+            }
+        }
+    }
+
     public static void breakImage(BlockEntityItemFrame blockEntity) throws IllegalArgumentException {
         Item item = blockEntity.getItem();
         if(item.getId() != ItemID.MAP
@@ -185,12 +204,17 @@ public class ImagePlugin extends PluginBase implements Listener {
     }
 
     public static void placeImage(RequestInformation info) throws IOException, FileNotFoundException {
+        placeImage(info, true);
+    }
+
+    public static void placeImage(RequestInformation info, boolean replaceBlock) throws IOException, FileNotFoundException {
         final Level level = info.pos1.getLevel();
         final ItemItemFrame itemItemFrame = new ItemItemFrame();
         final BlockItemFrame blockItemFrame = new BlockItemFrame();
         final BlockStone blockStone = new BlockStone();
         final int[] FACING = new int[]{4, 5, 3, 2, 1, 0};   // TODO CHECK UPDATE (BlockItemFrame.FANCING)
         final int horizontalFaceIndex = info.face.getHorizontalIndex();
+        final int randomId = ThreadLocalRandom.current().nextInt(999);
 
         blockItemFrame.level = level;
         blockStone.level = level;
@@ -208,6 +232,7 @@ public class ImagePlugin extends PluginBase implements Listener {
         info.putData("ip_ex", endX);
         info.putData("ip_ey", endY);
         info.putData("ip_ez", endZ);
+        info.putData("img_random_id", randomId);
         final boolean mode = startX == endX; // true == z is diff
 
         // Image Processing
@@ -217,8 +242,8 @@ public class ImagePlugin extends PluginBase implements Listener {
             throw new FileNotFoundException(info.filePath);
         }
 
-        int diffX =
-                mode ? (startZ - endZ + 1) : (startX - endX + 1);
+        int diffX
+                = mode ? (startZ - endZ + 1) : (startX - endX + 1);
         itemMapList = ImageUtils.getSplitImageMap(diffX, startY - endY + 1, ImageIO.read(imageFile), info.data);
 
         for (int x = startX; x >= endX; x--){
@@ -239,9 +264,11 @@ public class ImagePlugin extends PluginBase implements Listener {
                     blockAir.y = y;
                     blockAir.z = z;
 
+                    if(!replaceBlock && level.getBlock(x, y, z).getId() != BlockID.AIR) continue;
 
                     //blockItemFrame.place(itemItemFrame, blockAir, blockStone, info.face, blockAir.x, blockAir.y, blockAir.z, null);
-                    //BlockEntityItemFrame entity = (BlockEntityItemFrame) level.getBlockEntity(blockAir.getLocation());
+                    BlockEntityItemFrame blockEntity = (BlockEntityItemFrame) level.getBlockEntity(blockAir.getLocation());
+                    if(blockEntity != null) blockEntity.close();
 
                     blockItemFrame.setDamage(FACING[info.face.getIndex()]);
                     blockItemFrame.getLevel().setBlock(blockAir, blockItemFrame, true, false);
@@ -251,11 +278,45 @@ public class ImagePlugin extends PluginBase implements Listener {
                             .putInt("x", (int) blockAir.x)
                             .putInt("y", (int) blockAir.y)
                             .putInt("z", (int) blockAir.z)
+                            .putInt("PreventBug", ThreadLocalRandom.current().nextInt(99999) + 10000)
                             .putByte("ItemRotation", 0)
                             .putFloat("ItemDropChance", 1.0f);
                     BlockEntityItemFrame frame = (BlockEntityItemFrame) BlockEntity.createBlockEntity(BlockEntity.ITEM_FRAME, blockItemFrame.getLevel().getChunk((int) blockAir.x >> 4, (int) blockAir.z >> 4), nbt);
+                    frame.setItem( currentList.get(startY - y));
+                }
+            }
+        }
 
-                    frame.setItem(currentList.get(startY - y));
+        for (int x = startX; x >= endX; x -= 16) {
+            for (int z = startZ; z >= endZ; z -= 16) {
+                for (int y = startY; y >= endY; y -= 16) {
+                    FullChunk chunk = level.getChunk(x >> 4, z >> 4, false);
+
+                    try{
+                        chunk.getProvider().saveChunk(chunk.getX(), chunk.getZ());
+                    }catch (ChunkException e){
+                        for (Entity entity : chunk.getEntities().values()) {
+                            if(entity instanceof Player){
+                                ((Player) entity).sendMessage("§c청크를 저장할 수 없습니다. 이미지를 다른곳에 설치해주세요.");
+                            }
+                        }
+
+                        for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
+                            if(blockEntity instanceof BlockEntityItemFrame){
+                                BlockEntityItemFrame frame = (BlockEntityItemFrame) blockEntity;
+                                Item item = frame.getItem();
+                                CompoundTag tag = item.getNamedTag();
+
+                                if(tag != null && tag.exist("img_random_id") && tag.getString("img_random_id").equals(randomId)){
+                                    frame.close();
+                                }
+                            }
+                        }
+                    }
+
+                    for (Player player : level.getChunkPlayers(chunk.getX(), chunk.getZ()).values()) {
+                        player.onChunkChanged(chunk);
+                    }
                 }
             }
         }
