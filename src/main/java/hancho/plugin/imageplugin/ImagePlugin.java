@@ -21,8 +21,8 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.plugin.PluginBase;
+import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.utils.ChunkException;
 import hancho.plugin.imageplugin.entity.RequestInformation;
 
@@ -130,9 +130,23 @@ public class ImagePlugin extends PluginBase implements Listener {
 
     @EventHandler
     public void onItemFrameDropItem(ItemFrameDropItemEvent ev){
+        Block block = ev.getBlock();
         Item item = ev.getItem();
         CompoundTag tag = item.getNamedTag();
-        if(tag != null && tag.contains("ip_sx") && ! ev.getPlayer().getName().equals(tag.getString("img_owner"))) ev.setCancelled();
+        BlockEntityItemFrame blockEntity = (BlockEntityItemFrame) block.getLevel().getBlockEntity(block.getLocation());
+
+        if(tag != null && tag.contains("ip_sx")) {
+            ev.setCancelled();
+            if(ev.getPlayer().getName().equalsIgnoreCase(tag.getString("img_owner"))) {
+                this.getServer().getScheduler().scheduleAsyncTask(this, new AsyncTask() {
+                    @Override
+                    public void onRun() {
+                        breakImage(blockEntity);
+                        ev.getPlayer().sendMessage(PREFIX + "이미지가 파괴되었습니다.");
+                    }
+                });
+            }
+        }
     }
 
     @Override
