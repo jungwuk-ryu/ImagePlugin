@@ -10,6 +10,8 @@ import cn.nukkit.command.CommandSender;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
+import cn.nukkit.event.block.BlockBreakEvent;
+import cn.nukkit.event.block.BlockEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
 import cn.nukkit.event.block.ItemFrameDropItemEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
@@ -133,20 +135,19 @@ public class ImagePlugin extends PluginBase implements Listener {
         Block block = ev.getBlock();
         Item item = ev.getItem();
         CompoundTag tag = item.getNamedTag();
-        BlockEntityItemFrame blockEntity = (BlockEntityItemFrame) block.getLevel().getBlockEntity(block.getLocation());
+        BlockEntityItemFrame frame = (BlockEntityItemFrame) block.getLevel().getBlockEntity(block.getLocation());
 
-        if(tag != null && tag.contains("ip_sx")) {
-            ev.setCancelled();
-            if(ev.getPlayer().getName().equalsIgnoreCase(tag.getString("img_owner"))) {
-                this.getServer().getScheduler().scheduleAsyncTask(this, new AsyncTask() {
-                    @Override
-                    public void onRun() {
-                        breakImage(blockEntity);
-                        ev.getPlayer().sendMessage(PREFIX + "이미지가 파괴되었습니다.");
-                    }
-                });
-            }
-        }
+        processEvent(ev, tag, frame, ev.getPlayer());
+    }
+
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent ev){
+        Block block = ev.getBlock();
+        Item item = ev.getItem();
+        CompoundTag tag = item.getNamedTag();
+        BlockEntityItemFrame frame = (BlockEntityItemFrame) block.getLevel().getBlockEntity(block.getLocation());
+
+        processEvent(ev, tag, frame, ev.getPlayer());
     }
 
     @Override
@@ -338,6 +339,21 @@ public class ImagePlugin extends PluginBase implements Listener {
                         player.onChunkChanged(chunk);
                     }
                 }
+            }
+        }
+    }
+
+    private void processEvent(BlockEvent ev, CompoundTag tag, BlockEntityItemFrame blockEntityItemFrame, Player player){
+        if(tag != null && tag.contains("ip_sx")) {
+            ev.setCancelled();
+            if(player.getName().equalsIgnoreCase(tag.getString("img_owner"))) {
+                this.getServer().getScheduler().scheduleAsyncTask(this, new AsyncTask() {
+                    @Override
+                    public void onRun() {
+                        breakImage(blockEntityItemFrame);
+                        player.sendMessage(PREFIX + "이미지가 파괴되었습니다.");
+                    }
+                });
             }
         }
     }
