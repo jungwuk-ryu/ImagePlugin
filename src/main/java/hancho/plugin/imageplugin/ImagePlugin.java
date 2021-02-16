@@ -177,8 +177,8 @@ public class ImagePlugin extends PluginBase implements Listener {
         }
     }
 
-    public static void breakImage(BlockEntityItemFrame blockEntity) throws IllegalArgumentException {
-        Item item = blockEntity.getItem();
+    public static void breakImage(BlockEntityItemFrame entityItemFrame) throws IllegalArgumentException {
+        Item item = entityItemFrame.getItem();
         if(item.getId() != ItemID.MAP
                 || item.getNamedTag() == null
                 || !item.getNamedTag().contains("ip_sx")
@@ -191,13 +191,18 @@ public class ImagePlugin extends PluginBase implements Listener {
         final int endX = Integer.parseInt(tag.getString("ip_ex"));
         final int endY = Integer.parseInt(tag.getString("ip_ey"));
         final int endZ = Integer.parseInt(tag.getString("ip_ez"));
-        final Level level = blockEntity.level;
+        final Level level = entityItemFrame.level;
         final BlockAir blockAir = new BlockAir();
 
         for (int x = startX; x >= endX; x--) {
             for (int z = startZ; z >= endZ; z--) {
                 for (int y = startY; y >= endY; y--) {
-                    level.setBlock(new Vector3(x, y, z), blockAir, false, false);
+                    Vector3 vec = new Vector3(x, y, z);
+                    BlockEntity blockEntity = level.getBlockEntity(vec);
+
+                    if(blockEntity instanceof BlockEntityItemFrame) {
+                        level.setBlock(vec, blockAir, false, false);
+                    }
                 }
             }
         }
@@ -307,8 +312,9 @@ public class ImagePlugin extends PluginBase implements Listener {
                                 Item item = frame.getItem();
                                 CompoundTag tag = item.getNamedTag();
 
-                                if(tag != null && tag.exist("img_random_id") && tag.getString("img_random_id").equals(randomId)){
-                                    frame.close();
+                                if(tag != null && tag.getString("img_random_id").equals(Integer.toString(randomId))){
+                                    breakImage(frame);
+                                    return;
                                 }
                             }
                         }
