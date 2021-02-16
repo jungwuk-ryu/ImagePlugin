@@ -145,9 +145,11 @@ public class ImagePlugin extends PluginBase implements Listener {
         Block block = ev.getBlock();
         Item item = ev.getItem();
         CompoundTag tag = item.getNamedTag();
-        BlockEntityItemFrame frame = (BlockEntityItemFrame) block.getLevel().getBlockEntity(block.getLocation());
+        BlockEntity blockEntity = block.getLevel().getBlockEntity(block.getLocation());
 
-        processEvent(ev, tag, frame, ev.getPlayer());
+        if(blockEntity != null && blockEntity instanceof BlockEntityItemFrame) {
+            processEvent(ev, tag, (BlockEntityItemFrame) blockEntity, ev.getPlayer());
+        }
     }
 
     @Override
