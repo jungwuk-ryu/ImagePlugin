@@ -219,6 +219,7 @@ public class ImagePlugin extends PluginBase implements Listener {
 
                     if(blockEntity instanceof BlockEntityItemFrame) {
                         level.setBlock(vec, blockAir, false, false);
+                        blockEntity.close();
                     }
                 }
             }
